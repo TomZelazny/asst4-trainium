@@ -104,7 +104,7 @@ def vector_add_stream(a_vec, b_vec):
     M = a_vec.shape[0]
 
     # TODO: You should modify this variable for Step 1
-    FREE_DIM = 2
+    FREE_DIM = 200
 
     # The maximum size of our Partition Dimension
     PARTITION_DIM = 128
