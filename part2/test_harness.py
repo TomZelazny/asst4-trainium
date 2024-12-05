@@ -100,7 +100,7 @@ def test_correctness_conv2d_kernel(
 def test_performance_conv2d_kernel(
     kernel,
     dtype=np.float32,
-    batch_size=10,
+    batch_size=1,
     in_channels=256,
     out_channels=256,
     image_height=224,
@@ -111,8 +111,8 @@ def test_performance_conv2d_kernel(
 ):
 
     performance_requirements_by_dtype = {
-        np.float32: 42500,
-        np.float16: 12000
+        np.float32: 4300,
+        np.float16: 1300
     }
 
     X = np.random.rand(batch_size, in_channels, image_height, image_width).astype(dtype)
@@ -124,8 +124,10 @@ def test_performance_conv2d_kernel(
     args = [X, W, bias]
     kwargs = {"pool_size": pool_size}
 
+    dtype_str = "float32" if dtype == np.float32 else "float16"
+
     bench_func = nki.benchmark(
-        warmup=5, iters=20, save_neff_name=f"file_pool_{pool_size}.neff"
+        warmup=5, iters=20, save_neff_name=f"file_pool_{pool_size}_{dtype_str}.neff"
     )(kernel)
     text_trap = io.StringIO()
     sys.stdout = text_trap
@@ -235,7 +237,7 @@ if __name__ == "__main__":
         print("Performance test failed 😢")
 
     if args.profile is not None:
-        save_trace(args.profile, "file_pool_1.neff")
+        save_trace(args.profile + "_float32", "file_pool_1_float32.neff")
     
     print("Comparing performance with reference kernel (no maxpool, float16)...")
     test_result = test_performance_conv2d_kernel(conv2d, pool_size=1, dtype = np.float16)
@@ -245,7 +247,7 @@ if __name__ == "__main__":
         print("Performance test failed 😢")
 
     if args.profile is not None:
-        save_trace(args.profile, "file_pool_1.neff")
+        save_trace(args.profile + "_float16", "file_pool_1_float16.neff")
 
     if args.test_maxpool:
         print("Comparing performance with reference kernel (with maxpool, float32)...")
@@ -256,7 +258,7 @@ if __name__ == "__main__":
             print("Performance test failed 😢")
 
         if args.profile is not None:
-            save_trace(args.profile + "_pool", "file_pool_2.neff")
+            save_trace(args.profile + "_pool_float32", "file_pool_2_float32.neff")
 
         print("Comparing performance with reference kernel (with maxpool, float16)...")
         test_result = test_performance_conv2d_kernel(conv2d, pool_size=2, dtype = np.float16)
@@ -266,4 +268,4 @@ if __name__ == "__main__":
             print("Performance test failed 😢")
 
         if args.profile is not None:
-            save_trace(args.profile + "_pool", "file_pool_2.neff")
+            save_trace(args.profile + "_pool_float16", "file_pool_2_float16.neff")

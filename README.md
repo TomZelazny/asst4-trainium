@@ -1,6 +1,6 @@
 # Assignment 4: Programming a Machine Learning Accelerator #
 
-**Due Thurs Dec 5, 11:59pm**
+**Due Friday Dec 6, 11:59pm**
 
 **100 points total**
 
@@ -589,7 +589,7 @@ Now, our objective is to map the convolution operator onto thee high-performance
   <img src="https://github.com/stanford-cs149/asst4-trainium/blob/main/handout/matmul_formula.png" width=25% height=25%>
 </p>
 
-In class we discussed one way to convert convolution with many filters into a single large matrix multiplication.  We'll do the same thing here, but take a different approach that yields an efficient implementation on Trainium.  In this approach the convolution operation is formulated as a series of dependent matrix multiplications. A visual illustration of this formulation is shown below.
+In class we discussed one way to convert convolution with many filters into a single large matrix multiplication.  We'll do the same thing here, but take a different approach that yields an efficient implementation on Trainium.  In this approach the convolution operation is formulated as a series of independent matrix multiplications. A visual illustration of this formulation is shown below.
 
 <p align="center">
   <img src="https://github.com/stanford-cs149/asst4-trainium/blob/main/handout/conv2d_matmul_diagram.png" width=100% height=100%>
@@ -599,12 +599,9 @@ In this approach, the height and width dimensions of the input feature map are f
 
 Below is the pseudocode for the described algorithm:
 ```
-# Reshape input and weight to align for matrix multiplication
-input =  input.reshape(Height * Width, Input_Channels)
-weight = weight.reshape(Filter_Height, Filter_Width, Input_Channels, Output_Channels)
-
-# Initialize Output with zeros
-output = zeros([Height * Width, Output_Channels])
+- Have the input image with shape (Input Channels, Image Height * Image Width)
+- Have the filter weights with shape (Filter Height, Filter Weight, Input Channels, Output Channels)
+- Initialize the output to appropriate shape of (Output Channels, Output Height * Output Width)
 
 # Iterate over the filter height
 for i in range(Filter_Height):
@@ -614,9 +611,11 @@ for i in range(Filter_Height):
         # Shift the Input tensor by (i, j) to align with the filter's current position
         input_shifted = shift(input, (i, j))
 
-        # Perform matrix multiplication between the input and the weights from the filter slice
-        output += matmul(input_shifted, weight[i, j, :, :])
+        # Perform matrix multiplication between the input and the filter slice
+        output += matmul(transpose(weight[i,j,:,:]), input_shifted)
 ```
+
+> Do note that this just an algorithmic description, and the purpose of this assignment is for you to figure out to map this algorithmic description to an efficient implementation on this hardware!
 
 ### Max Pool Layer Overview
 Max pooling layers are commonly used in CNNs between successive convolutional layers to reduce the size of the feature maps. Not only does this prevent excessively large feature maps which can pose a problem for computational resources, but it also reduces the amount of parameters in the CNN which effectively reduces model overfitting.
@@ -640,7 +639,7 @@ The diagram above illustrates the calculations your fused kernel would perform o
 
 Your fused kernel takes in the following parameters:
   - `X` - A batch of input images. `X` has shape `(Batch Size, Input Channels, Input Height, Input Width)`. You are guaranteed that `Input Channels` will be a multiple of 128.
-  - `W` - The convolution filter weights. `W` has shape `(Output Channels, Input Channels, Filter Height, Filter Width)`. You are guaranteed that `Filter Height == Filter Width`. You are also guaranteed that `Output Channels` is a multiple of 128.
+  - `W` - The convolution filter weights. `W` has shape `(Output Channels, Input Channels, Filter Height, Filter Width)`. You are guaranteed that `Filter Height == Filter Width`. You are also guaranteed that `Output Channels` is a multiple of 128. Moreover, you can assume that the size of the weights would always be such that it can completely fit inside SBUF.
   - `bias` - The convolution filter biases. `bias` has shape `(Output Channels)`
   - `pool_size` - The size of the max pooling filter and pooling stride. You are guaranteed that the size of the input, the size of the filter, and the `pool_size` would be such that everything is nicely divisible. More concretely, `(Input Height - Filter Height + 1) % Pool Size == 0`.  Notice that if the value of `pool_size` is `1`, then the fused kernel operates as a normal convolution kernel. This gives us the flexibility to choose whether we want max pooling or not.
 
@@ -672,17 +671,17 @@ For the performance test, we evaluate the performance under different configurat
   - Part 1 Questions: 30 Points
   - Part 2 Questions: 10 Points
 
-**Correctness of Fused Convolution - MaxPool Kernel: 10 Points**
-  - With Small Images: 2.5 points
-  - With Large Images: 2.5 points
-  - With Bias Addition: 2.5 points
-  - With Max Pool: 2.5 points
+**Correctness of Fused Convolution - MaxPool Kernel: 45 Points + 2.5 Points EC**
+  - With Small Images: 15 points
+  - With Large Images: 15 points
+  - With Bias Addition: 15 points
+  - With Max Pool: 2.5 points EC
 
-**Performance of Fused Convolution - MaxPool Kernel on Large Images: 50 Points**
-  - Without Max Pool (Float 16): 17.5 points
-  - Without Max Pool (Float 32): 17.5 points
-  - With Max Pool (Float 16): 7.5 points
-  - With Max Pool (Float 32): 7.5 points
+**Performance of Fused Convolution - MaxPool Kernel on Large Images: 15 Points + 5 Points EC**
+  - Without Max Pool (Float 16): 7.5 points
+  - Without Max Pool (Float 32): 7.5 points
+  - With Max Pool (Float 16): 2.5 points
+  - With Max Pool (Float 32): 2.5 points
 
 ## Hand-in Instructions
 
