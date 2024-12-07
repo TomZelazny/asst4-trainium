@@ -91,7 +91,10 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
         buffer=nl.sbuf
     )
 
-    W_sbuf[:,:,:,:,:,:] = nl.load(W[:,:,:,:,:,:])
+    for c_out_tile in nl.affine_range(n_tiles_c_out):
+        for c_in_tile in nl.affine_range(n_tiles_c_in):
+            W_sbuf[c_out_tile, :, :, :, :, :] = nl.copy(W[c_out_tile, :, :, :, :, :], dtype=W.dtype)
+    
     print("<<< W_sbuf.shape:", W_sbuf.shape)
 
 
