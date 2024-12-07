@@ -110,7 +110,6 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
 
     #- transpose that to get an array of shape:
     #   (filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_in_pmax), c_out_pmax), call this w
-
     # TODO later: transpose w
 
         
