@@ -94,7 +94,7 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     w = nl.ndarray(((filter_height, filter_width, nl.par_dim(out_channels), in_channels)), dtype=W.dtype, buffer=nl.sbuf)
     for filter_row in nl.affine_range(filter_height):
         for filter_col in nl.affine_range(filter_width):
-            w[filter_row, filter_col, :, :] = nl.copy(W[:, :, filter_row, filter_col])
+            w[filter_row, filter_col, :, :] = nl.load(W[:, :, filter_row, filter_col])
             # for c_out_tile in nl.affine_range(n_tiles_c_out):
             #     for c_in_tile in nl.affine_range(n_tiles_c_in):
             #         w[filter_row, filter_col, c_out_tile, c_in_tile] = nl.copy(W[c_out_tile, :, c_in_tile, :, filter_row, filter_col])
