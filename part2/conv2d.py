@@ -75,11 +75,29 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     n_tiles_c_in = in_channels // c_in_pmax
     n_tiles_c_out = out_channels // c_out_pmax
     
-    #- load in the weights into an SBUF array of shape (n_tiles_out_channels, nl.par_dim(c_out_pmax), n_tiles_in_channels, 128, kernel_height, kernel_width)
-    #- move data around using nl.copy to get an array of shape (kernel_height, kernel_width, n_tiles_out_channels, n_tiles_in_channels, nl.par_dim(c_out_pmax), c_in_pmax)
-    #- transpose that to get an array of shape (kernel_height, kernel_width, n_tiles_out_channels, n_tiles_in_channels, nl.par_dim(c_in_pmax), c_out_pmax), call this w
-    w = nl.ndarray((filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_in_pmax), c_out_pmax), dtype=W.dtype, buffer=nl.sbuf)
-
+    #- load in the weights into an SBUF array of shape:
+    #   (n_tiles_c_out, nl.par_dim(c_out_pmax), n_tiles_c_in, c_in_pmax, filter_height, filter_width)
+    #- move data around using nl.copy to get an array of shape:
+    #   (filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_out_pmax), c_in_pmax)
+    #- transpose that to get an array of shape:
+    #   (filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_in_pmax), c_out_pmax), call this w
+    W = W.reshape((n_tiles_c_out, c_out_pmax, n_tiles_c_in, c_in_pmax, filter_height, filter_width))
+    W_sbuf = nl.ndarray(
+        shape=(n_tiles_c_out, nl.par_dim(c_out_pmax), n_tiles_c_in, c_in_pmax, filter_height, filter_width),
+        dtype=W.dtype,
+        buffer=nl.sbuf
+    )
+    W_sbuf[...] = nl.load(W)
+    
+    w = nl.ndarray(
+        shape=(filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_in_pmax), c_out_pmax),
+        dtype=W.dtype,
+        buffer=nl.sbuf
+    )
+    for filter_row in nl.affine_range(filter_height):
+        for filter_col in nl.affine_range(filter_width):
+            w[filter_row, filter_col, ...] = nl.copy(W_sbuf[..., filter_row, filter_col])
+        
     # Process the images in batches
     for b in nl.affine_range(batch_size):
         print("<<< x[b].shape normal print:", X[b].shape)
