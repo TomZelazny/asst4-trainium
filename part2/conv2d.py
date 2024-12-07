@@ -77,10 +77,6 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     
     #- load in the weights into an SBUF array of shape:
     #   (n_tiles_c_out, nl.par_dim(c_out_pmax), n_tiles_c_in, c_in_pmax, filter_height, filter_width)
-    #- move data around using nl.copy to get an array of shape:
-    #   (filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_out_pmax), c_in_pmax)
-    #- transpose that to get an array of shape:
-    #   (filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_in_pmax), c_out_pmax), call this w
     print("<<< W.shape:", W.shape)
     W = W.reshape((n_tiles_c_out, c_out_pmax, n_tiles_c_in, c_in_pmax, filter_height, filter_width))
     print("<<< W.shape after reshape:", W.shape)
@@ -92,10 +88,27 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     )
 
     for c_out_tile in nl.affine_range(n_tiles_c_out):
-        for c_in_tile in nl.affine_range(n_tiles_c_in):
-            W_sbuf[c_out_tile, :, :, :, :, :] = nl.load(W[c_out_tile, :, :, :, :, :], dtype=W.dtype)
+        W_sbuf[c_out_tile, :, :, :, :, :] = nl.load(W[c_out_tile, :, :, :, :, :], dtype=W.dtype)
     
     print("<<< W_sbuf.shape:", W_sbuf.shape)
+    
+    #- move data around using nl.copy to get an array of shape:
+    #   (filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_out_pmax), c_in_pmax)
+    w_copy = nl.ndarray(
+        shape=(filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_out_pmax), c_in_pmax),
+        dtype=W.dtype,
+        buffer=nl.sbuf
+    )
+
+    # for filter_row in nl.affine_range(filter_height):
+    #     for filter_col in nl.affine_range(filter_width):
+    #         for c_out_tile in nl.affine_range(n_tiles_c_out):
+    #             for c_in_tile in nl.affine_range(n_tiles_c_in):
+    #                 w_copy[filter_row, filter_col, :, :, :, :] = nl.copy(W_sbuf[:, :, :, :, filter_row, filter_col])
+
+
+    #- transpose that to get an array of shape:
+    #   (filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_in_pmax), c_out_pmax), call this w
 
 
     
