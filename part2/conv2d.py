@@ -91,7 +91,7 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
         buffer=nl.sbuf
     )
 
-    W_sbuf[...] = nl.load(W)
+    W_sbuf[...] = nl.load(W[:,:,:,:,:,:])
     print("<<< W_sbuf.shape:", W_sbuf.shape)
 
 
