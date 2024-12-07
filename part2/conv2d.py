@@ -87,7 +87,9 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
         dtype=W.dtype,
         buffer=nl.sbuf
     )
-    W_sbuf[...] = nl.load(W)
+
+    for tile_c_out in nl.affine_range(n_tiles_c_out):
+        W_sbuf[tile_c_out, ...] = nl.load(W[tile_c_out])
     
     w = nl.ndarray(
         shape=(filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_in_pmax), c_out_pmax),
