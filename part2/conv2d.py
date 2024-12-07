@@ -81,10 +81,9 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     #   (filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_out_pmax), c_in_pmax)
     #- transpose that to get an array of shape:
     #   (filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_in_pmax), c_out_pmax), call this w
-    print("<<< W.shape before reshape:", W.shape)
+    print("<<< W.shape:", W.shape)
     # W = W.reshape((n_tiles_c_out, c_out_pmax, n_tiles_c_in, c_in_pmax, filter_height, filter_width))
-    W = W.reshape((out_channels * in_channels, filter_height * filter_width))
-    print("<<< W.shape after reshape:", W.shape)
+    # print("<<< W.shape after reshape:", W.shape)
 
     # W_sbuf = nl.ndarray(
     #     shape=(n_tiles_c_out, nl.par_dim(c_out_pmax), n_tiles_c_in, c_in_pmax, filter_height, filter_width),
@@ -93,26 +92,13 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     # )
     
     w = nl.ndarray(((filter_height, filter_width, nl.par_dim(out_channels), in_channels)), dtype=W.dtype, buffer=nl.sbuf)
-    w = nl.load_transpose2d(W)
+    for filter_row in nl.affine_range(filter_height):
+        for filter_col in nl.affine_range(filter_width):
+            w[filter_row, filter_col, :, :] = nl.copy(W[:, :, filter_row, filter_col])
+            # for c_out_tile in nl.affine_range(n_tiles_c_out):
+            #     for c_in_tile in nl.affine_range(n_tiles_c_in):
+            #         w[filter_row, filter_col, c_out_tile, c_in_tile] = nl.copy(W[c_out_tile, :, c_in_tile, :, filter_row, filter_col])
     print("<<< w.shape:", w.shape)
-
-
-    # for tile_c_out in nl.affine_range(n_tiles_c_out):
-    #     print("<<< W_sbuf[tile_c_out].shape:", W_sbuf[tile_c_out].shape)
-    #     print("<<< W[tile_c_out, :, :, :, :, :].shape:", W[tile_c_out, :, :, :, :, :].shape)
-    #     W_sbuf[tile_c_out] = nl.load(W[tile_c_out, :, :, :, :, :])
-    
-    # print("<<< W_sbuf.shape:", W_sbuf.shape)
-
-    # w_temp = nl.ndarray(
-    #     shape=(filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_out_pmax), c_in_pmax),
-    #     dtype=W.dtype,
-    #     buffer=nl.sbuf
-    # )
-
-    # for filter_row in nl.affine_range(filter_height):
-    #     for filter_col in nl.affine_range(filter_width):
-    #         w_temp[filter_row, filter_col] = nl.copy(W_sbuf[:, :, :, :, filter_row, filter_col])
 
         
     # Process the images in batches
