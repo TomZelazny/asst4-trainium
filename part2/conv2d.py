@@ -111,6 +111,7 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
                             )
                             print("<<< output.shape:", output.shape)
                             print("<<< output_row_psum.shape:", output_row_psum.shape)
+                            print("<<< output_row_psum:", output_row_psum)
                             # nl.device_print("output_row_psum", output_row_psum.shape)
 
                 #- copy stuff from PSUM back to SBUF
