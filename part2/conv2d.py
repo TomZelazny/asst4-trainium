@@ -83,7 +83,7 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     #   (filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_in_pmax), c_out_pmax), call this w
     print("<<< W.shape before reshape:", W.shape)
     # W = W.reshape((n_tiles_c_out, c_out_pmax, n_tiles_c_in, c_in_pmax, filter_height, filter_width))
-    W = W.reshape((out_channels * in_channels, filter_height * filter_width)).T.reshape((filter_height, filter_width, out_channels, in_channels))
+    W = W.reshape((out_channels * in_channels, filter_height * filter_width)).transpose().reshape((filter_height, filter_width, out_channels, in_channels))
     print("<<< W.shape after reshape:", W.shape)
 
     # W_sbuf = nl.ndarray(
