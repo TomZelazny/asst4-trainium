@@ -81,7 +81,10 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     #   (filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_out_pmax), c_in_pmax)
     #- transpose that to get an array of shape:
     #   (filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_in_pmax), c_out_pmax), call this w
+    print("<<< W.shape before reshape:", W.shape)
     W = W.reshape((n_tiles_c_out, c_out_pmax, n_tiles_c_in, c_in_pmax, filter_height, filter_width))
+    print("<<< W.shape after reshape:", W.shape)
+
     W_sbuf = nl.ndarray(
         shape=(n_tiles_c_out, nl.par_dim(c_out_pmax), n_tiles_c_in, c_in_pmax, filter_height, filter_width),
         dtype=W.dtype,
@@ -89,7 +92,7 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     )
 
     for tile_c_out in nl.affine_range(n_tiles_c_out):
-        print("<<< W_sbuf[tile_c_out, ...].shape:", W_sbuf[tile_c_out, ...].shape)
+        print("<<< W_sbuf[tile_c_out].shape:", W_sbuf[tile_c_out].shape)
         print("<<< W[tile_c_out, :, :, :, :, :].shape:", W[tile_c_out, :, :, :, :, :].shape)
         W_sbuf[tile_c_out, ...] = nl.load(W[tile_c_out, :, :, :, :, :])
     
