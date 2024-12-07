@@ -94,7 +94,7 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     
     #- move data around using nl.copy to get an array of shape:
     #   (filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_out_pmax), c_in_pmax)
-    w_copy = nl.ndarray(
+    w = nl.ndarray(
         shape=(filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_out_pmax), c_in_pmax),
         dtype=W.dtype,
         buffer=nl.sbuf
@@ -104,15 +104,14 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
         for filter_row in nl.affine_range(filter_height):
             for filter_col in nl.affine_range(filter_width):
                 for c_in_tile in nl.affine_range(n_tiles_c_in):
-                    w_copy[filter_row, filter_col, c_out_tile, c_in_tile, :, :] = nl.copy(W_sbuf[c_out_tile, :, c_in_tile, :, filter_row, filter_col])
+                    w[filter_row, filter_col, c_out_tile, c_in_tile, :, :] = nl.copy(W_sbuf[c_out_tile, :, c_in_tile, :, filter_row, filter_col])
 
-    print("<<< w_copy.shape:", w_copy.shape)
+    print("<<< w.shape:", w.shape)
+
     #- transpose that to get an array of shape:
     #   (filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_in_pmax), c_out_pmax), call this w
 
-
-    
-    # print("<<< w.shape:", w.shape)
+    # TODO later: transpose w
 
         
     # Process the images in batches
