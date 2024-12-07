@@ -109,11 +109,12 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
                                 w[filter_row, filter_col, c_out_tile, curr_c_in_tile, :, :],
                                 x[curr_c_in_tile, :, output_row + filter_row, filter_col:filter_col + out_width]
                             )
-                            print("<<< output_row_psum.shape normal print:", output_row_psum.shape)
+                            print("<<< output.shape:", output.shape)
+                            print("<<< output_row_psum.shape:", output_row_psum.shape)
                             # nl.device_print("output_row_psum", output_row_psum.shape)
 
                 #- copy stuff from PSUM back to SBUF
-                output[output_row] = nl.copy(output_row_psum, dtype=X.dtype)
+                output[:,output_row,:] = nl.copy(output_row_psum, dtype=X.dtype)
             #- copy stuff from SBUF back to HBM
             nl.store(X_out[b, c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax, :, :], value=output)
     return X_out
