@@ -116,11 +116,11 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
         
     # Process the images in batches
     for b in nl.affine_range(batch_size):
-        print("<<< x[b].shape normal print:", X[b].shape)
+        # print("<<< x[b].shape normal print:", X[b].shape)
         #- assign space in SBUF to store entire image, call it x
         #- shape : (n_tiles_c_in, nl.par_dim(c_in_pmax), image_height, image_width)
         x = nl.ndarray((n_tiles_c_in, nl.par_dim(c_in_pmax), input_height, input_width), dtype=X.dtype, buffer=nl.sbuf)
-        print("<<< x.shape normal print:", x.shape)
+        # print("<<< x.shape normal print:", x.shape)
         # nl.device_print("x", x[0].shape)
 
         for c_in_tile in nl.affine_range(n_tiles_c_in):
@@ -143,16 +143,16 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
                                 w[filter_row, filter_col, c_out_tile, curr_c_in_tile, :, :],
                                 x[curr_c_in_tile, :, output_row + filter_row, filter_col:filter_col + out_width]
                             )
-                            print("<<< output.shape:", output.shape)
-                            print("<<< output_row_psum.shape:", output_row_psum.shape)
-                            nl.device_print("output_row_psum", output_row_psum)
-                            print("after device print")
+                            # print("<<< output.shape:", output.shape)
+                            # print("<<< output_row_psum.shape:", output_row_psum.shape)
+                            # nl.device_print("output_row_psum", output_row_psum)
+                            # print("after device print")
 
                 #- copy stuff from PSUM back to SBUF
                 output[:,output_row,:] = nl.copy(output_row_psum, dtype=X.dtype)
             #- copy stuff from SBUF back to HBM
-            print(">>> X_out.shape:", X_out[b, c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax, :, :].shape)
-            print(">>> output.shape:", output.shape)
+            # print(">>> X_out.shape:", X_out[b, c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax, :, :].shape)
+            # print(">>> output.shape:", output.shape)
             nl.store(X_out[b, c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax, :, :], value=output)
     return X_out
 
