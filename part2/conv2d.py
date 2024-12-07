@@ -72,6 +72,7 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     
     # Process the images in batches
     for b in nl.affine_range(batch_size):
+        print("x[b].shape:", X[b].shape)
         nl.device_print("x[b].shape:", X[b].shape)
         #- assign space in SBUF to store entire image, call it x
         #- shape : (n_tiles_c_in, nl.par_dim(c_in_pmax), image_height, image_width)
