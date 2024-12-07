@@ -120,7 +120,7 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
         #- assign space in SBUF to store entire image, call it x
         #- shape : (n_tiles_c_in, nl.par_dim(c_in_pmax), image_height, image_width)
         x = nl.ndarray((n_tiles_c_in, nl.par_dim(c_in_pmax), input_height, input_width), dtype=X.dtype, buffer=nl.sbuf)
-        # print("<<< x.shape normal print:", x.shape)
+        print("<<< x.shape:", x.shape)
         # nl.device_print("x", x[0].shape)
 
         for c_in_tile in nl.affine_range(n_tiles_c_in):
