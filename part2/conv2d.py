@@ -66,13 +66,41 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
 
     # Various tiling dimensions (You may want to define more of them)
     c_in_pmax = nl.tile_size.pmax
+    c_out_pmax = nl.tile_size.pmax
     n_tiles_c_in = in_channels // c_in_pmax
-
+    n_tiles_c_out = out_channels // c_out_pmax
+    
     # Process the images in batches
     for b in nl.affine_range(batch_size):
-        # TODO: Perform the convolution of X[b] with the weights W and bias b, followed by a maxpool
-        # and store the result in X_out[b]
-        continue
+        nki.device_print(f"x[b].shape: {X[b].shape}")
+        #- assign space in SBUF to store entire image, call it x
+        #- shape : (n_tiles_c_in, nl.par_dim(c_in_pmax), image_height, image_width)
+        x = nl.ndarray((n_tiles_c_in, nl.par_dim(c_in_pmax), input_height, input_width), dtype=X.dtype, buffer=nl.sbuf)
 
+        for c_in_tile in nl.affine_range(n_tiles_c_in):
+            #- load corresponding part of input image
+            x[c_in_tile] = nl.load(X[b, c_in_tile * c_in_pmax : (c_in_tile + 1) * c_in_pmax, :, :])
+        
+        for c_out_tile in nl.affine_range(n_tiles_c_out):
+            #- assign space in SBUF to store output
+            #- shape : (nl.par_dim(c_out_pmax), out_height, out_width)
+            output = nl.ndarray((nl.par_dim(c_out_pmax), out_height, out_width), dtype=X.dtype, buffer=nl.sbuf)
+            for output_row in nl.affine_rangee(out_height):
+                #- assign space in PSUM to store output row
+                output_row_psum = nl.zeros((nl.par_dim(c_out_pmax), out_width), nl.float32, buffer=nl.psum)
+                for filter_row in nl.affine_range(filter_height):
+                    for filter_col in nl.affine_range(filter_width):
+                        for curr_c_in_tile in nl.affine_range(n_tiles_c_in):
+                            #- matmul w[filter_row, filter_height, n_tile_c_out, n_tile_cin, :, :].T with
+                            #- x[curr_c_in_tile, :, out_row + filter_row, filter_width:filter_width + filter_col]
+                            output_row_psum += nl.matmul(
+                                W[c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax, curr_c_in_tile * c_in_pmax : (curr_c_in_tile + 1) * c_in_pmax, filter_row, filter_col],
+                                x[curr_c_in_tile, :, output_row + filter_row, filter_col],
+                            transpose_x=True)
+
+                #- copy stuff from PSUM back to SBUF
+                output[output_row] = nl.copy(output_row_psum, dtype=X.dtype)
+            #- copy stuff from SBUF back to HBM
+            nl.store(X_out[b, c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax, :, :], value=output)
     return X_out
 
