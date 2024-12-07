@@ -51,7 +51,9 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     out_pool_height = out_height // pool_size
     out_pool_width = out_width // pool_size
 
-    print("<<< input input_height, input_width:", input_height, input_width)
+    print("---")
+    print("<<< in_channels, input_height, input_width:", in_channels, input_height, input_width)
+    print("<<< out_channels, filter_height, filter_width:", out_channels, filter_height, filter_width)
     print("<<< out_height, out_width:", out_height, out_width)
     
     # Can assume multiple of 128 to avoid using mask
