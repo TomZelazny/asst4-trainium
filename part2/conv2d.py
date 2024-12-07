@@ -101,9 +101,9 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
                             #- matmul w[filter_row, filter_height, n_tile_c_out, n_tile_cin, :, :].T with
                             #- x[curr_c_in_tile, :, out_row + filter_row, filter_width:filter_width + filter_col]
                             output_row_psum += nl.matmul(
-                                W[c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax, curr_c_in_tile * c_in_pmax : (curr_c_in_tile + 1) * c_in_pmax, filter_row, filter_col],
-                                x[curr_c_in_tile, :, output_row + filter_row, filter_col],
-                            transpose_x=True)
+                                w[filter_row, filter_col, c_out_tile, curr_c_in_tile, :, :],
+                                x[curr_c_in_tile, :, output_row + filter_row, filter_col:filter_col + out_width]
+                            )
 
                 #- copy stuff from PSUM back to SBUF
                 output[output_row] = nl.copy(output_row_psum, dtype=X.dtype)
