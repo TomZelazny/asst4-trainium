@@ -96,6 +96,8 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
         print("<<< W[tile_c_out, :, :, :, :, :].shape:", W[tile_c_out, :, :, :, :, :].shape)
         W_sbuf[tile_c_out] = nl.load(W[tile_c_out, :, :, :, :, :])
     
+    print("<<< W_sbuf.shape:", W_sbuf.shape)
+
     w = nl.ndarray(
         shape=(filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_in_pmax), c_out_pmax),
         dtype=W.dtype,
@@ -103,7 +105,7 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     )
     for filter_row in nl.affine_range(filter_height):
         for filter_col in nl.affine_range(filter_width):
-            w[filter_row, filter_col, ...] = nl.copy(W_sbuf[..., filter_row, filter_col])
+            w[filter_row, filter_col] = nl.copy(W_sbuf[:, :, :, :, filter_row, filter_col], dtype=W.dtype)
         
     # Process the images in batches
     for b in nl.affine_range(batch_size):
