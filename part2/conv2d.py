@@ -50,11 +50,6 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
 
     out_pool_height = out_height // pool_size
     out_pool_width = out_width // pool_size
-
-    print("---")
-    print("<<< in_channels, input_height, input_width:", in_channels, input_height, input_width)
-    print("<<< out_channels, filter_height, filter_width:", out_channels, filter_height, filter_width)
-    print("<<< out_height, out_width:", out_height, out_width)
     
     # Can assume multiple of 128 to avoid using mask
     assert in_channels % 128 == 0
@@ -74,10 +69,15 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     c_out_pmax = nl.tile_size.pmax
     n_tiles_c_in = in_channels // c_in_pmax
     n_tiles_c_out = out_channels // c_out_pmax
+
+    print("---")
+    print("<<< in_channels, input_height, input_width:", in_channels, input_height, input_width)
+    print("<<< out_channels, filter_height, filter_width:", out_channels, filter_height, filter_width)
+    print("<<< out_height, out_width:", out_height, out_width)
+    print("<<< n_tiles_c_in, n_tiles_c_out:", n_tiles_c_in, n_tiles_c_out)
     
     #- load in the weights into an SBUF array of shape:
     #   (n_tiles_c_out, nl.par_dim(c_out_pmax), n_tiles_c_in, c_in_pmax, filter_height, filter_width)
-    print("<<< W.shape:", W.shape)
     W = W.reshape((n_tiles_c_out, c_out_pmax, n_tiles_c_in, c_in_pmax, filter_height, filter_width))
     print("<<< W.shape after reshape:", W.shape)
 
@@ -86,11 +86,9 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
         dtype=W.dtype,
         buffer=nl.sbuf
     )
-
     for c_out_tile in nl.affine_range(n_tiles_c_out):
         W_sbuf[c_out_tile, :, :, :, :, :] = nl.load(W[c_out_tile, :, :, :, :, :], dtype=W.dtype)
     
-    print("<<< W_sbuf.shape:", W_sbuf.shape)
     
     #- move data around using nl.copy to get an array of shape:
     #   (filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_out_pmax), c_in_pmax)
@@ -118,7 +116,6 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
         #- assign space in SBUF to store entire image, call it x
         #- shape : (n_tiles_c_in, nl.par_dim(c_in_pmax), image_height, image_width)
         print("<<< X[b].shape:", X[b].shape)
-        print("<<< n_tiles_c_in, c_in_pmax, input_height, input_width:", n_tiles_c_in, c_in_pmax, input_height, input_width)
         x = nl.ndarray((n_tiles_c_in, nl.par_dim(c_in_pmax), input_height, input_width), dtype=X.dtype, buffer=nl.sbuf)
         print("<<< x.shape:", x.shape)
         # nl.device_print("x", x[0].shape)
@@ -146,13 +143,10 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
                             # print("<<< output.shape:", output.shape)
                             # print("<<< output_row_psum.shape:", output_row_psum.shape)
                             # nl.device_print("output_row_psum", output_row_psum)
-                            # print("after device print")
 
                 #- copy stuff from PSUM back to SBUF
                 output[:,output_row,:] = nl.copy(output_row_psum, dtype=X.dtype)
             #- copy stuff from SBUF back to HBM
-            # print(">>> X_out.shape:", X_out[b, c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax, :, :].shape)
-            # print(">>> output.shape:", output.shape)
             nl.store(X_out[b, c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax, :, :], value=output)
     return X_out
 
