@@ -69,7 +69,7 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     c_out_pmax = nl.tile_size.pmax
     n_tiles_c_in = in_channels // c_in_pmax
     n_tiles_c_out = out_channels // c_out_pmax
-    out_chunks = 6
+    out_chunks = 4
     n_out_chunks = (out_height + out_chunks - 1) // out_chunks
     chunk_height = out_chunks + filter_height - 1
 
