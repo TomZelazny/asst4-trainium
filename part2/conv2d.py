@@ -124,6 +124,8 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
                 #- assign space in SBUF to store output
                 #- shape : (nl.par_dim(c_out_pmax), out_height, out_width)
                 output = nl.ndarray((nl.par_dim(c_out_pmax), out_chunks, out_width), dtype=X.dtype, buffer=nl.sbuf)
+                bias_psum = nl.ndarray((nl.par_dim(c_out_pmax),), dtype=bias.dtype, buffer=nl.psum)
+                bias_psum = nl.load(bias[c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax],)
                 for output_row in nl.affine_range(out_chunks):
                     #- assign space in PSUM to store output row
                     output_row_psum = nl.zeros((nl.par_dim(c_out_pmax), out_width), nl.float32, buffer=nl.psum)
@@ -138,7 +140,7 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
                                 )
 
                     #- copy stuff from PSUM back to SBUF
-                    b_output_row = nisa.tensor_scalar(output_row_psum, np.add, bias[c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax])
+                    b_output_row = nisa.tensor_scalar(output_row_psum, np.add, bias_psum)
                     print("<<< b_output_row.shape:", b_output_row.shape)
                     output[:,output_row,:] = nl.copy(b_output_row, dtype=X.dtype)
                 #- copy stuff from SBUF back to HBM
