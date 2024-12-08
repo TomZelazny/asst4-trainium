@@ -69,6 +69,8 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     c_out_pmax = nl.tile_size.pmax
     n_tiles_c_in = in_channels // c_in_pmax
     n_tiles_c_out = out_channels // c_out_pmax
+    out_chunks = 2
+    n_out_chunks = (out_height + out_chunks - 1) // out_chunks
 
     print("---")
     print("<<< in_channels, input_height, input_width:", in_channels, input_height, input_width)
@@ -87,7 +89,7 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
         buffer=nl.sbuf
     )
     for c_out_tile in nl.affine_range(n_tiles_c_out):
-        W_sbuf[c_out_tile, :, :, :, :, :] = nl.load(W[c_out_tile, :, :, :, :, :], dtype=W.dtype)
+        W_sbuf[c_out_tile] = nl.load(W[c_out_tile])
     
     
     #- move data around using nl.copy to get an array of shape:
