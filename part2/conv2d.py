@@ -73,14 +73,6 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     n_out_chunks = (out_height + out_chunks - 1) // out_chunks
     chunk_height = out_chunks + filter_height - 1
 
-    print("---")
-    print("<<< in_channels, input_height, input_width:", in_channels, input_height, input_width)
-    print("<<< out_channels, filter_height, filter_width:", out_channels, filter_height, filter_width)
-    print("<<< out_height, out_width:", out_height, out_width)
-    print("<<< n_tiles_c_in, n_tiles_c_out:", n_tiles_c_in, n_tiles_c_out)
-    print("<<< out_chunks, n_out_chunks, chunk_height:", out_chunks, n_out_chunks, chunk_height)
-    print("<<< X[b].shape:", X[0].shape)
-
     #- load in the weights into an SBUF array of shape:
     #   (n_tiles_c_out, nl.par_dim(c_out_pmax), n_tiles_c_in, c_in_pmax, filter_height, filter_width)
     W = W.reshape((n_tiles_c_out, c_out_pmax, n_tiles_c_in, c_in_pmax, filter_height, filter_width))
@@ -114,7 +106,6 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
             #- assign space in SBUF to store entire image, call it x
             #- shape : (n_tiles_c_in, nl.par_dim(c_in_pmax), image_height, image_width)
             x = nl.ndarray((n_tiles_c_in, nl.par_dim(c_in_pmax), chunk_height, input_width), dtype=X.dtype, buffer=nl.sbuf)
-            print("<<< x.shape:", x.shape)
 
             for c_in_tile in nl.affine_range(n_tiles_c_in):
                 #- load corresponding part of input image
@@ -141,7 +132,6 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
 
                     #- copy stuff from PSUM back to SBUF
                     b_output_row = nisa.tensor_scalar(output_row_psum, np.add, bias_psum)
-                    print("<<< b_output_row.shape:", b_output_row.shape)
                     output[:,output_row,:] = nl.copy(b_output_row, dtype=X.dtype)
                 #- copy stuff from SBUF back to HBM
                 nl.store(X_out[b, c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax, n*out_chunks:(n+1)*out_chunks, :], value=output)
