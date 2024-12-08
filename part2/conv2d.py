@@ -134,7 +134,7 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
                 #- assign space in SBUF to store output
                 #- shape : (nl.par_dim(c_out_pmax), out_height, out_width)
                 output = nl.ndarray((nl.par_dim(c_out_pmax), out_chunks, out_width), dtype=X.dtype, buffer=nl.sbuf)
-                for output_row in nl.affine_range(chunk_height):
+                for output_row in nl.affine_range(out_chunks):
                     #- assign space in PSUM to store output row
                     output_row_psum = nl.zeros((nl.par_dim(c_out_pmax), out_width), nl.float32, buffer=nl.psum)
                     for filter_row in nl.affine_range(filter_height):
