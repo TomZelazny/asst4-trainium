@@ -71,6 +71,7 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     n_tiles_c_out = out_channels // c_out_pmax
     out_chunks = 2
     n_out_chunks = (out_height + out_chunks - 1) // out_chunks
+    chunk_height = out_chunks + filter_height - 1
 
     print("---")
     print("<<< in_channels, input_height, input_width:", in_channels, input_height, input_width)
@@ -115,40 +116,58 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
         
     # Process the images in batches
     for b in nl.affine_range(batch_size):
-        #- assign space in SBUF to store entire image, call it x
-        #- shape : (n_tiles_c_in, nl.par_dim(c_in_pmax), image_height, image_width)
-        print("<<< X[b].shape:", X[b].shape)
-        x = nl.ndarray((n_tiles_c_in, nl.par_dim(c_in_pmax), input_height, input_width), dtype=X.dtype, buffer=nl.sbuf)
-        print("<<< x.shape:", x.shape)
-        # nl.device_print("x", x[0].shape)
+        for n in nl.affine_range(n_out_chunks):            
+            #- assign space in SBUF to store entire image, call it x
+            #- shape : (n_tiles_c_in, nl.par_dim(c_in_pmax), image_height, image_width)
+            print("<<< X[b].shape:", X[b].shape)
+            x = nl.ndarray((n_tiles_c_in, nl.par_dim(c_in_pmax), chunk_height, input_width), dtype=X.dtype, buffer=nl.sbuf)
+            print("<<< x.shape:", x.shape)
+            # nl.device_print("x", x[0].shape)
 
-        for c_in_tile in nl.affine_range(n_tiles_c_in):
-            #- load corresponding part of input image
-            x[c_in_tile] = nl.load(X[b, c_in_tile * c_in_pmax : (c_in_tile + 1) * c_in_pmax, :, :])
-        
-        for c_out_tile in nl.affine_range(n_tiles_c_out):
-            #- assign space in SBUF to store output
-            #- shape : (nl.par_dim(c_out_pmax), out_height, out_width)
-            output = nl.ndarray((nl.par_dim(c_out_pmax), out_height, out_width), dtype=X.dtype, buffer=nl.sbuf)
-            for output_row in nl.affine_range(out_height):
-                #- assign space in PSUM to store output row
-                output_row_psum = nl.zeros((nl.par_dim(c_out_pmax), out_width), nl.float32, buffer=nl.psum)
-                for filter_row in nl.affine_range(filter_height):
-                    for filter_col in nl.affine_range(filter_width):
-                        for c_in_tile in nl.affine_range(n_tiles_c_in):
-                            #- matmul w[filter_row, filter_height, n_tile_c_out, n_tile_cin, :, :].T with
-                            #- x[c_in_tile, :, out_row + filter_row, filter_width:filter_width + filter_col]
-                            output_row_psum += nl.matmul(
-                                w[filter_row, filter_col, c_out_tile, c_in_tile, :, :],
-                                x[c_in_tile, :, output_row + filter_row, filter_col:filter_col + out_width]
-                            )
-                            # print("<<< output.shape:", output.shape)
-                            # print("<<< output_row_psum.shape:", output_row_psum.shape)
-                            # nl.device_print("output_row_psum", output_row_psum)
+            for c_in_tile in nl.affine_range(n_tiles_c_in):
+                #- load corresponding part of input image
+                x[c_in_tile] = nl.load(X[b, c_in_tile * c_in_pmax : (c_in_tile + 1) * c_in_pmax, n * chunk_height: (n+1) * chunk_height, :])
+            
+            for c_out_tile in nl.affine_range(n_tiles_c_out):
+                #- assign space in SBUF to store output
+                #- shape : (nl.par_dim(c_out_pmax), out_height, out_width)
+                output = nl.ndarray((nl.par_dim(c_out_pmax), out_chunks, out_width), dtype=X.dtype, buffer=nl.sbuf)
+                for output_row in nl.affine_range(chunk_height):
+                    #- assign space in PSUM to store output row
+                    output_row_psum = nl.zeros((nl.par_dim(c_out_pmax), out_width), nl.float32, buffer=nl.psum)
+                    for filter_row in nl.affine_range(filter_height):
+                        for filter_col in nl.affine_range(filter_width):
+                            for c_in_tile in nl.affine_range(n_tiles_c_in):
+                                #- matmul w[filter_row, filter_height, n_tile_c_out, n_tile_cin, :, :].T with
+                                #- x[c_in_tile, :, out_row + filter_row, filter_width:filter_width + filter_col]
+                                output_row_psum += nl.matmul(
+                                    w[filter_row, filter_col, c_out_tile, c_in_tile, :, :],
+                                    x[c_in_tile, :, output_row + filter_row, filter_col:filter_col + out_width]
+                                )
+                                # print("<<< output.shape:", output.shape)
+                                # print("<<< output_row_psum.shape:", output_row_psum.shape)
+                                # nl.device_print("output_row_psum", output_row_psum)
 
-                #- copy stuff from PSUM back to SBUF
-                output[:,output_row,:] = nl.copy(output_row_psum, dtype=X.dtype)
-            #- copy stuff from SBUF back to HBM
-            nl.store(X_out[b, c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax, :, :], value=output)
+                    #- copy stuff from PSUM back to SBUF
+                    output[:,(n * chunk_height) + output_row,:] = nl.copy(output_row_psum, dtype=X.dtype)
+                #- copy stuff from SBUF back to HBM
+                nl.store(X_out[b, c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax, :, :], value=output)
     return X_out
 
+# out_chunk = nl.zeros((n_tiles_c_out, nl.par_dim(c_out_pmax), out_chunks, out_width), nl.float32, buffer=nl.psum)
+# for c_in_tile in nl.affine_range(n_tiles_c_in):
+#     x = nl.load(X[b, c_in_tile * c_in_pmax : (c_in_tile + 1) * c_in_pmax, :, :])
+#     for c_out_tile in nl.affine_range(n_tiles_c_out):
+#         for output_chunk in nl.affine_range(out_chunks):
+#             output = nl.zeros((nl.par_dim(c_out_pmax), out_width), nl.float32, buffer=nl.psum)
+#             for filter_row in nl.affine_range(filter_height):
+#                 for filter_col in nl.affine_range(filter_width):
+#                     output += nl.matmul(
+#                         w[filter_row, filter_col, c_out_tile, c_in_tile, :, :],
+#                         x[:, output_chunk * out_width + filter_col : (output_chunk + 1) * out_width + filter_col]
+#                     )
+#             out_chunk[c_out_tile, :, output_chunk, :] += output
+
+# for c_out_tile in nl.affine_range(n_tiles_c_out):
+#     for output_chunk in nl.affine_range(out_chunks):
+#         X_out[b, c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax, n * out_chunks + output_chunk, :] = out_chunk[c_out_tile, :, output_chunk, :]
