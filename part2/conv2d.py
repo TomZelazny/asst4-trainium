@@ -138,8 +138,9 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
                                 )
 
                     #- copy stuff from PSUM back to SBUF
-                    print(nisa.tensor_scalar(nl.copy(output_row_psum, dtype=X.dtype), np.add, bias[c_out_tile]).shape)
-                    output[:,output_row,:] = nisa.tensor_scalar(nl.copy(output_row_psum, dtype=X.dtype), np.add, bias[c_out_tile])
+                    b_output_row = nisa.tensor_scalar(output_row_psum, np.add, bias[c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax])
+                    print("<<< b_output_row.shape:", b_output_row.shape)
+                    output[:,output_row,:] = nl.copy(b_output_row, dtype=X.dtype)
                 #- copy stuff from SBUF back to HBM
                 nl.store(X_out[b, c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax, n*out_chunks:(n+1)*out_chunks, :], value=output)
     return X_out
