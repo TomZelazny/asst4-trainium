@@ -117,7 +117,7 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
         
     # Process the images in batches
     for b in nl.affine_range(batch_size):
-        for n in nl.affine_range(n_out_chunks):            
+        for n in nl.affine_range(n_out_chunks):
             #- assign space in SBUF to store entire image, call it x
             #- shape : (n_tiles_c_in, nl.par_dim(c_in_pmax), image_height, image_width)
             print("<<< X[b].shape:", X[b].shape)
@@ -127,7 +127,8 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
 
             for c_in_tile in nl.affine_range(n_tiles_c_in):
                 #- load corresponding part of input image
-                x[c_in_tile] = nl.load(X[b, c_in_tile * c_in_pmax : (c_in_tile + 1) * c_in_pmax, n * chunk_height: (n+1) * chunk_height, :])
+                print("<<< n * chunk_height : (n+1) * chunk_height", n * chunk_height , (n+1) * chunk_height)
+                x[c_in_tile] = nl.load(X[b, c_in_tile * c_in_pmax : (c_in_tile + 1) * c_in_pmax, n * chunk_height : (n+1) * chunk_height, :])
             
             for c_out_tile in nl.affine_range(n_tiles_c_out):
                 #- assign space in SBUF to store output
