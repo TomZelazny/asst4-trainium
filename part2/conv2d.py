@@ -78,6 +78,7 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     print("<<< out_channels, filter_height, filter_width:", out_channels, filter_height, filter_width)
     print("<<< out_height, out_width:", out_height, out_width)
     print("<<< n_tiles_c_in, n_tiles_c_out:", n_tiles_c_in, n_tiles_c_out)
+    print("<<< out_chunks, n_out_chunks, chunk_height:", out_chunks, n_out_chunks, chunk_height)
     
     #- load in the weights into an SBUF array of shape:
     #   (n_tiles_c_out, nl.par_dim(c_out_pmax), n_tiles_c_in, c_in_pmax, filter_height, filter_width)
