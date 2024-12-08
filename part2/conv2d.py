@@ -136,12 +136,12 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
                 output_row_psum = nl.zeros((nl.par_dim(c_out_pmax), out_width), nl.float32, buffer=nl.psum)
                 for filter_row in nl.affine_range(filter_height):
                     for filter_col in nl.affine_range(filter_width):
-                        for curr_c_in_tile in nl.affine_range(n_tiles_c_in):
+                        for c_in_tile in nl.affine_range(n_tiles_c_in):
                             #- matmul w[filter_row, filter_height, n_tile_c_out, n_tile_cin, :, :].T with
-                            #- x[curr_c_in_tile, :, out_row + filter_row, filter_width:filter_width + filter_col]
+                            #- x[c_in_tile, :, out_row + filter_row, filter_width:filter_width + filter_col]
                             output_row_psum += nl.matmul(
-                                w[filter_row, filter_col, c_out_tile, curr_c_in_tile, :, :],
-                                x[curr_c_in_tile, :, output_row + filter_row, filter_col:filter_col + out_width]
+                                w[filter_row, filter_col, c_out_tile, c_in_tile, :, :],
+                                x[c_in_tile, :, output_row + filter_row, filter_col:filter_col + out_width]
                             )
                             # print("<<< output.shape:", output.shape)
                             # print("<<< output_row_psum.shape:", output_row_psum.shape)
