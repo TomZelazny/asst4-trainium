@@ -83,7 +83,6 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     #- load in the weights into an SBUF array of shape:
     #   (n_tiles_c_out, nl.par_dim(c_out_pmax), n_tiles_c_in, c_in_pmax, filter_height, filter_width)
     W = W.reshape((n_tiles_c_out, c_out_pmax, n_tiles_c_in, c_in_pmax, filter_height, filter_width))
-    print("<<< W.shape after reshape:", W.shape)
 
     W_sbuf = nl.ndarray(
         shape=(n_tiles_c_out, nl.par_dim(c_out_pmax), n_tiles_c_in, c_in_pmax, filter_height, filter_width),
@@ -107,13 +106,6 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
             for filter_col in nl.affine_range(filter_width):
                 for c_in_tile in nl.affine_range(n_tiles_c_in):
                     w[filter_row, filter_col, c_out_tile, c_in_tile, :, :] = nl.copy(W_sbuf[c_out_tile, :, c_in_tile, :, filter_row, filter_col])
-
-    print("<<< w.shape:", w.shape)
-
-    #- transpose that to get an array of shape:
-    #   (filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_in_pmax), c_out_pmax), call this w
-    # TODO later: transpose w
-
         
     # Process the images in batches
     for b in nl.affine_range(batch_size):
@@ -123,11 +115,9 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
             print("<<< X[b].shape:", X[b].shape)
             x = nl.ndarray((n_tiles_c_in, nl.par_dim(c_in_pmax), chunk_height, input_width), dtype=X.dtype, buffer=nl.sbuf)
             print("<<< x.shape:", x.shape)
-            # nl.device_print("x", x[0].shape)
 
             for c_in_tile in nl.affine_range(n_tiles_c_in):
                 #- load corresponding part of input image
-                print("<<< chunk_height", chunk_height)
                 x[c_in_tile] = nl.load(X[b, c_in_tile*c_in_pmax : (c_in_tile + 1)*c_in_pmax, n*out_chunks : (n*out_chunks) + chunk_height, :])
             
             for c_out_tile in nl.affine_range(n_tiles_c_out):
@@ -146,30 +136,9 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
                                     w[filter_row, filter_col, c_out_tile, c_in_tile, :, :],
                                     x[c_in_tile, :, output_row + filter_row, filter_col:filter_col + out_width]
                                 )
-                                # print("<<< output.shape:", output.shape)
-                                # print("<<< output_row_psum.shape:", output_row_psum.shape)
-                                # nl.device_print("output_row_psum", output_row_psum)
 
                     #- copy stuff from PSUM back to SBUF
                     output[:,output_row,:] = nl.copy(output_row_psum, dtype=X.dtype)
                 #- copy stuff from SBUF back to HBM
                 nl.store(X_out[b, c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax, n*out_chunks:(n+1)*out_chunks, :], value=output)
     return X_out
-
-# out_chunk = nl.zeros((n_tiles_c_out, nl.par_dim(c_out_pmax), out_chunks, out_width), nl.float32, buffer=nl.psum)
-# for c_in_tile in nl.affine_range(n_tiles_c_in):
-#     x = nl.load(X[b, c_in_tile * c_in_pmax : (c_in_tile + 1) * c_in_pmax, :, :])
-#     for c_out_tile in nl.affine_range(n_tiles_c_out):
-#         for output_chunk in nl.affine_range(out_chunks):
-#             output = nl.zeros((nl.par_dim(c_out_pmax), out_width), nl.float32, buffer=nl.psum)
-#             for filter_row in nl.affine_range(filter_height):
-#                 for filter_col in nl.affine_range(filter_width):
-#                     output += nl.matmul(
-#                         w[filter_row, filter_col, c_out_tile, c_in_tile, :, :],
-#                         x[:, output_chunk * out_width + filter_col : (output_chunk + 1) * out_width + filter_col]
-#                     )
-#             out_chunk[c_out_tile, :, output_chunk, :] += output
-
-# for c_out_tile in nl.affine_range(n_tiles_c_out):
-#     for output_chunk in nl.affine_range(out_chunks):
-#         X_out[b, c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax, n * out_chunks + output_chunk, :] = out_chunk[c_out_tile, :, output_chunk, :]
