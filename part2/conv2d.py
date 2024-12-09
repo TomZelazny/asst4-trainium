@@ -1,7 +1,7 @@
 import numpy as np
 import math
 
-import neuronxcc.nki as nki
+from neuronxcc import nki
 import neuronxcc.nki.language as nl
 import neuronxcc.nki.isa as nisa
 from neuronxcc.nki import baremetal
@@ -95,7 +95,7 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     w = nl.ndarray(
         shape=(filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_out_pmax), c_in_pmax),
         dtype=W.dtype,
-        buffer=nki.sbuf.mod_alloc(base_addr=current_offset, num_free_tiles=(FREE_DIM_TILES,))
+        buffer=nki.compiler.sbuf.mod_alloc(base_addr=current_offset, num_free_tiles=(FREE_DIM_TILES,))
     )
     current_offset += FREE_DIM_TILES * c_in_pmax * itemsize
 
