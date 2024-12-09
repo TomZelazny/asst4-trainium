@@ -95,18 +95,30 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     
     #- move data around using nl.copy to get an array of shape:
     #   (filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_out_pmax), c_in_pmax)
-    w = nl.ndarray(
+    weight_copy = nl.ndarray(
         shape=(filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_out_pmax), c_in_pmax),
         dtype=W.dtype,
-        buffer=ncc.sbuf.mod_alloc(base_addr=current_offset, num_free_tiles=(FREE_DIM_TILES,))
+        buffer=nl.sbuf
     )
-    current_offset += FREE_DIM_TILES * c_in_pmax * itemsize
+    w = nl.ndarray(
+        shape=(filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_in_pmax), c_out_pmax),
+        dtype=W.dtype,
+        buffer=nl.sbuf
+    )
+
+    # w = nl.ndarray(
+    #     shape=(filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_out_pmax), c_in_pmax),
+    #     dtype=W.dtype,
+    #     buffer=ncc.sbuf.mod_alloc(base_addr=current_offset, num_free_tiles=(FREE_DIM_TILES,))
+    # )
+    # current_offset += FREE_DIM_TILES * c_in_pmax * itemsize
 
     for c_out_tile in nl.affine_range(n_tiles_c_out):
-        for filter_row in nl.affine_range(filter_height):
-            for filter_col in nl.affine_range(filter_width):
-                for c_in_tile in nl.affine_range(n_tiles_c_in):
-                    w[filter_row, filter_col, c_out_tile, c_in_tile, :, :] = nl.copy(W_sbuf[c_out_tile, :, c_in_tile, :, filter_row, filter_col])
+        for c_in_tile in nl.affine_range(n_tiles_c_in):
+            for i in nl.affine_range(filter_height):
+                for j in nl.affine_range(filter_width):
+                    weight_copy[i, j, c_out_tile, c_in_tile, :, :] = nl.copy(W_sbuf[c_out_tile, :, c_in_tile, :, i, j], dtype = W.dtype)
+                    w[i, j, c_out_tile, c_in_tile] = nisa.nc_transpose(weight_copy[i, j, c_out_tile, c_in_tile])
         
     # Process the images in batches
     for b in nl.affine_range(batch_size):
@@ -148,7 +160,8 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
                                 #- x[c_in_tile, :, out_row + filter_row, filter_width:filter_width + filter_col]
                                 output_row_psum += nl.matmul(
                                     w[filter_row, filter_col, c_out_tile, c_in_tile, :, :],
-                                    x[c_in_tile, :, output_row + filter_row, filter_col:filter_col + out_width]
+                                    x[c_in_tile, :, output_row + filter_row, filter_col:filter_col + out_width],
+                                    transpose_x=True
                                 )
 
                     #- copy stuff from PSUM back to SBUF
