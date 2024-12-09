@@ -69,7 +69,7 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     c_out_pmax = nl.tile_size.pmax
     n_tiles_c_in = in_channels // c_in_pmax
     n_tiles_c_out = out_channels // c_out_pmax
-    out_chunks = 4
+    out_chunks = 2 # may need to set as pool_size
     n_out_chunks = (out_height + out_chunks - 1) // out_chunks
     chunk_height = out_chunks + filter_height - 1
 
@@ -105,7 +105,11 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
         for n in nl.affine_range(n_out_chunks):
             #- assign space in SBUF to store entire image, call it x
             #- shape : (n_tiles_c_in, nl.par_dim(c_in_pmax), image_height, image_width)
-            x = nl.ndarray((n_tiles_c_in, nl.par_dim(c_in_pmax), chunk_height, input_width), dtype=X.dtype, buffer=nl.sbuf)
+            x = nl.ndarray(
+                shape=(n_tiles_c_in, nl.par_dim(c_in_pmax), chunk_height, input_width),
+                dtype=X.dtype,
+                buffer=nl.sbuf
+            )
 
             for c_in_tile in nl.affine_range(n_tiles_c_in):
                 #- load corresponding part of input image
@@ -114,8 +118,16 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
             for c_out_tile in nl.affine_range(n_tiles_c_out):
                 #- assign space in SBUF to store output
                 #- shape : (nl.par_dim(c_out_pmax), out_height, out_width)
-                output = nl.ndarray((nl.par_dim(c_out_pmax), out_chunks, out_width), dtype=X.dtype, buffer=nl.sbuf)
-                bias_sbuf = nl.ndarray((nl.par_dim(c_out_pmax),), dtype=bias.dtype, buffer=nl.sbuf)
+                conv_output = nl.ndarray(
+                    shape=(nl.par_dim(c_out_pmax), out_chunks, out_width),
+                    dtype=X.dtype,
+                    buffer=nl.sbuf
+                )
+                bias_sbuf = nl.ndarray(
+                    shape=(nl.par_dim(c_out_pmax),),
+                    dtype=bias.dtype,
+                    buffer=nl.sbuf
+                )
                 bias_sbuf = nl.load(bias[c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax],)
                 for output_row in nl.affine_range(out_chunks):
                     #- assign space in PSUM to store output row
@@ -132,7 +144,8 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
 
                     #- copy stuff from PSUM back to SBUF
                     b_output_row = nisa.tensor_scalar(output_row_psum, np.add, bias_sbuf)
-                    output[:,output_row,:] = nl.copy(b_output_row, dtype=X.dtype)
+                    conv_output[:,output_row,:] = nl.copy(b_output_row, dtype=X.dtype)
+                
                 #- copy stuff from SBUF back to HBM
-                nl.store(X_out[b, c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax, n*out_chunks:(n+1)*out_chunks, :], value=output)
+                nl.store(X_out[b, c_out_tile * c_out_pmax : (c_out_tile + 1) * c_out_pmax, n*out_chunks:(n+1)*out_chunks, :], value=conv_output)
     return X_out
