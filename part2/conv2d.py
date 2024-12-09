@@ -85,9 +85,9 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     W_sbuf = nl.ndarray(
         shape=(n_tiles_c_out, nl.par_dim(c_out_pmax), n_tiles_c_in, c_in_pmax, filter_height, filter_width),
         dtype=W.dtype,
-        buffer=ncc.sbuf.mod_alloc(base_addr=current_offset, num_free_tiles=(FREE_DIM_TILES,))
+        buffer=nl.sbuf
     )
-    current_offset += FREE_DIM_TILES * c_in_pmax * itemsize
+    # current_offset += FREE_DIM_TILES * c_in_pmax * itemsize
 
     for c_out_tile in nl.affine_range(n_tiles_c_out):
         W_sbuf[c_out_tile] = nl.load(W[c_out_tile])
@@ -128,9 +128,9 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
             x = nl.ndarray(
                 shape=(n_tiles_c_in, nl.par_dim(c_in_pmax), chunk_height, input_width),
                 dtype=X.dtype,
-                buffer=ncc.sbuf.mod_alloc(base_addr=current_offset, num_free_tiles=(FREE_DIM_TILES,))
+                buffer=nl.sbuf
             )
-            current_offset += FREE_DIM_TILES * c_in_pmax * itemsize
+            # current_offset += FREE_DIM_TILES * c_in_pmax * itemsize
 
             for c_in_tile in nl.affine_range(n_tiles_c_in):
                 #- load corresponding part of input image
