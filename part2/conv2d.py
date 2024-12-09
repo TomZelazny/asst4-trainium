@@ -73,6 +73,10 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     n_out_chunks = (out_height + out_chunks - 1) // out_chunks
     chunk_height = out_chunks + filter_height - 1
 
+    byteSize = X.itemsize
+    current_offset = 0
+    FREE_DIM_TILES = 4
+
     #- load in the weights into an SBUF array of shape:
     #   (n_tiles_c_out, nl.par_dim(c_out_pmax), n_tiles_c_in, c_in_pmax, filter_height, filter_width)
     W = W.reshape((n_tiles_c_out, c_out_pmax, n_tiles_c_in, c_in_pmax, filter_height, filter_width))
@@ -91,8 +95,9 @@ def fused_conv2d_maxpool(X, W, bias, pool_size=1):
     w = nl.ndarray(
         shape=(filter_height, filter_width, n_tiles_c_out, n_tiles_c_in, nl.par_dim(c_out_pmax), c_in_pmax),
         dtype=W.dtype,
-        buffer=nl.sbuf
+        buffer=nisa.sbuf.mod_alloc(base_addr=current_offset, num_free_tiles=(FREE_DIM_TILES,))
     )
+    current_offset += FREE_DIM_TILES * c_in_pmax * byteSize
 
     for c_out_tile in nl.affine_range(n_tiles_c_out):
         for filter_row in nl.affine_range(filter_height):
